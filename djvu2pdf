@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# adapted from https://gist.github.com/matthieuheitz/7287e214b1aeda7948f6c27fbfb5288b
+# Method found here https://askubuntu.com/a/122604/423332
+
+# Dependencies:
+# On debian andubuntu, you can install ocrodjvu and pdfbeads with:
+#   apt install ocrodjvu
+#   gem install pdfbeads
+
+# The path and filename given can only contain ascii characters
+f=$1
+
+# Get filename
+filename=$(basename -- "$f")
+extension="${filename##*.}"
+file_no_ext="${filename%.*}"
+
+# Count number of pages
+echo "f=$f"
+p=$(djvused -e n "$f")
+echo -e "The document contains $p pages.\n"
+
+# Number of digits
+pp=${#p}
+
+echo "###############################"
+echo "### Extracting page by page ###"
+echo "###############################"
+
+# For each page, extract the text, and the image
+for i in $( seq 1 $p)
+do
+    ii=$(printf %0${pp}d $i)
+    djvu2hocr -p $i "$f" | sed 's/ocrx/ocr/g' > pg$ii.html
+    ddjvu -format=tiff -page=$i "$f" pg$ii.tiff
+done
+
+echo ""
+echo "##############################"
+echo "### Building the final pdf ###"
+echo "##############################"
+
+# Build the final pdf
+djvused $filename -e 'print-outline' > toc.txt
+python3 ~/projects/djvu2pdf/djvu2pdf_toc_parser.py < toc.txt > toc.out.txt
+pdfbeads --toc toc.out.txt > "$file_no_ext".pdf
+
+echo ""
+echo "Done"
+
+
+# Remove temp files
+rm toc.txt toc.out.txt
+rm pg*.html pg*.tiff pg*.jp2
+
+
